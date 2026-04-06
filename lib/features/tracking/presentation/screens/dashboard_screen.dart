@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/providers/auth_notifier.dart';
+import '../../../profile/presentation/providers/profile_notifier.dart';
+import '../../../profile/presentation/screens/profile_screen.dart';
 import '../widgets/macros_circular_progress.dart';
+import 'camera_capture_screen.dart';
 
 // Petit provider temporaire pour simuler l'état local avant le raccordement Grok
 final dailyCaloriesProvider = StateProvider<int>((ref) => 1850);
@@ -21,6 +24,15 @@ class DashboardScreen extends ConsumerWidget {
     final protein = ref.watch(dailyProteinProvider);
     final carbs = ref.watch(dailyCarbsProvider);
     final fat = ref.watch(dailyFatProvider);
+    
+    // Écoute du profil
+    final profileState = ref.watch(profileProvider);
+    final int targetCalories = profileState.value?.targetCalories ?? 2500;
+    
+    // Macros déduits sommairement de la cible calorique pour l'UI (Ratio 30/45/25)
+    final targetProtein = (targetCalories * 0.3 / 4).round();
+    final targetCarbs = (targetCalories * 0.45 / 4).round();
+    final targetFat = (targetCalories * 0.25 / 9).round();
 
     return Scaffold(
       appBar: AppBar(
@@ -29,27 +41,34 @@ class DashboardScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.settings, color: Colors.white),
             onPressed: () {
-              // Menu pop-up pour se déconnecter
+              // Menu pop-up pour se déconnecter ou gérer profil
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(
                   backgroundColor: AppTheme.surfaceColor,
-                  title: const Text('Paramètres', style: TextStyle(color: Colors.white)),
-                  content: const Text('Souhaitez-vous vous déconnecter de votre session ?', style: TextStyle(color: Colors.white70)),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Annuler', style: TextStyle(color: Colors.grey)),
-                    ),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ref.read(authNotifierProvider.notifier).logout();
-                      },
-                      child: const Text('Déconnexion', style: TextStyle(color: Colors.white)),
-                    ),
-                  ],
+                  title: const Text('Menu', style: TextStyle(color: Colors.white)),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                       ListTile(
+                         leading: const Icon(Icons.person, color: Colors.white),
+                         title: const Text('Mon Profil', style: TextStyle(color: Colors.white)),
+                         onTap: () {
+                           Navigator.pop(context);
+                           Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+                         },
+                       ),
+                       const Divider(color: Colors.grey),
+                       ListTile(
+                         leading: const Icon(Icons.logout, color: Colors.red),
+                         title: const Text('Déconnexion', style: TextStyle(color: Colors.red)),
+                         onTap: () {
+                           Navigator.pop(context);
+                           ref.read(authNotifierProvider.notifier).logout();
+                         },
+                       ),
+                    ]
+                  ),
                 ),
               );
             },
@@ -99,7 +118,7 @@ class DashboardScreen extends ConsumerWidget {
                         width: 150,
                         height: 150,
                         child: CircularProgressIndicator(
-                          value: calories / 2500, // Objectif fixe simulé à 2500
+                          value: calories / targetCalories,
                           backgroundColor: Colors.grey[850],
                           color: AppTheme.neonOrange,
                           strokeWidth: 12,
@@ -116,9 +135,9 @@ class DashboardScreen extends ConsumerWidget {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const Text(
-                            '/2500 kcal',
-                            style: TextStyle(color: Colors.grey, fontSize: 14),
+                          Text(
+                            '/$targetCalories kcal',
+                            style: const TextStyle(color: Colors.grey, fontSize: 14),
                           ),
                         ],
                       )
@@ -137,19 +156,19 @@ class DashboardScreen extends ConsumerWidget {
                 MacrosCircularProgress(
                   label: 'PROTÉINES',
                   current: protein,
-                  target: 180,
+                  target: targetProtein,
                   color: AppTheme.proteinColor,
                 ),
                 MacrosCircularProgress(
                   label: 'GLUCIDES',
                   current: carbs,
-                  target: 280,
+                  target: targetCarbs,
                   color: AppTheme.carbsColor,
                 ),
                 MacrosCircularProgress(
                   label: 'LIPIDES',
                   current: fat,
-                  target: 80,
+                  target: targetFat,
                   color: AppTheme.fatColor,
                 ),
               ],
@@ -160,19 +179,7 @@ class DashboardScreen extends ConsumerWidget {
             // Bouton Scanner Repas
             ElevatedButton.icon(
               onPressed: () {
-                // TODO: Naviguer vers la vue Caméra (CameraCaptureScreen)
-                /* Logique de simulation: on va simuler qu'un repas est scanné */
-                ref.read(dailyCaloriesProvider.notifier).state += 450;
-                ref.read(dailyProteinProvider.notifier).state += 30;
-                ref.read(dailyCarbsProvider.notifier).state += 45;
-                ref.read(dailyFatProvider.notifier).state += 15;
-                
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Repas analysé avec succès ! (Simulation)'),
-                    backgroundColor: AppTheme.neonGreen,
-                  )
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const CameraCaptureScreen()));
               },
               icon: const Icon(Icons.camera_alt),
               label: const Text('SCANNER UN REPAS'),

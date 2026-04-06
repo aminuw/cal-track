@@ -3,6 +3,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../providers/tracking_notifier.dart';
 
@@ -19,6 +20,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
   List<CameraDescription> _cameras = [];
   bool _isInit = false;
   String _errorMessage = '';
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -62,19 +64,40 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
       final image = await _controller!.takePicture();
       
       // Appel direct au Notifier Riverpod (Point de contact entre UI et réseau/BDD)
-      await ref.read(trackingNotifierProvider.notifier).analyzeCapturedImage(File(image.path));
-      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Photo prise et analyse en cours...'), backgroundColor: AppTheme.neonGreen),
+          const SnackBar(content: Text('Photo prise ! Analyse de l\'IA en cours...'), backgroundColor: AppTheme.neonGreen),
         );
         Navigator.pop(context); // Retourne au dashboard pendant l'analyse
       }
       
+      await ref.read(trackingNotifierProvider.notifier).analyzeCapturedImage(File(image.path));
+      
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Erreur Camera: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Image importée ! Analyse IA en cours...'), backgroundColor: AppTheme.neonGreen)
+          );
+          Navigator.pop(context); // Retour au dashboard
+        }
+        await ref.read(trackingNotifierProvider.notifier).analyzeCapturedImage(File(image.path));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur d\'importation Galerie: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -121,29 +144,40 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> {
             bottom: 40,
             left: 0,
             right: 0,
-            child: Center(
-              child: GestureDetector(
-                onTap: _takePicture,
-                child: Container(
-                  height: 80,
-                  width: 80,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppTheme.neonOrange, width: 4),
-                    color: Colors.white.withOpacity(0.2),
-                  ),
-                  child: Center(
-                    child: Container(
-                      height: 60,
-                      width: 60,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppTheme.neonOrange,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // Bouton Galerie
+                IconButton(
+                  onPressed: _pickFromGallery,
+                  icon: const Icon(Icons.photo_library, color: Colors.white, size: 36),
+                ),
+                // Bouton Capture
+                GestureDetector(
+                  onTap: _takePicture,
+                  child: Container(
+                    height: 80,
+                    width: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppTheme.neonOrange, width: 4),
+                      color: Colors.white.withOpacity(0.2),
+                    ),
+                    child: Center(
+                      child: Container(
+                        height: 60,
+                        width: 60,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppTheme.neonOrange,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+                // Symétrie UI
+                const SizedBox(width: 48),
+              ],
             ),
           )
         ],
